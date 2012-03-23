@@ -1,11 +1,16 @@
 package edu.ucla.cens.pdc.phone;
 
+import java.util.Calendar;
+
+import org.json.simple.JSONObject;
+
 import android.app.Service;
 import android.content.Intent;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.SystemClock;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 
 public class BackgroundService extends Service{
@@ -35,6 +40,9 @@ public class BackgroundService extends Service{
 			// mHandler.removeCallbacks(mUpdateTimeTask);
         	// mHandler.postDelayed(mUpdateTimeTask, 1000);
 		}    
+		TelephonyManager manager = 
+				(TelephonyManager)getSystemService(TELEPHONY_SERVICE);
+		_imei = manager.getDeviceId();
 		_stopSensing = true;
 		Log.i(TAG, "onCreate BackgroundService called command called");		
 	}
@@ -42,19 +50,29 @@ public class BackgroundService extends Service{
 	private static Runnable mUpdateFeatureTimeTask = new Runnable(){
 		public void run(){
 			//Log.v(TAG,"Storing Variance");
-			NDNActivity.getReadingsService().updateVarArray();	
+			Second.getReadingsService().updateVarArray();	
 			if(!_stopSensing)
 				mFeatureHandler.postAtTime(this,SystemClock.uptimeMillis() + ONE_SECOND);		
 		}
 	};
 
 	private static Runnable mPutInDatabaseTask = new Runnable() {
+		@SuppressWarnings("unchecked")
 		public void run() {
 			Log.v(TAG,"Put in Database called");
-			NDNActivity.getReadingsService().addEvent();
+			JSONObject jsonObjAccel = Second.getReadingsService().
+					addEvent();
 			//Making way for new values
-			NDNActivity.getReadingsService().clearVarArray();
-			NDNActivity.getLocationListenerService().addGPSData();
+			Second.getReadingsService().clearVarArray();
+			JSONObject jsonObjGPS = Second.getLocationListenerService().
+					addGPSData();
+			JSONObject jsonObjMerge = new JSONObject();
+			jsonObjMerge.putAll(jsonObjGPS);
+			jsonObjMerge.putAll(jsonObjAccel);
+			jsonObjMerge.put("IMEI", _imei);
+			NDNManager.getInstance().addObjectToRepo(jsonObjMerge.toString());
+			Log.i(TAG,"JSON Object Merge: " + jsonObjMerge);
+			
 			if(!_stopSensing)
 				mDatabaseHandler.postAtTime(this, 
 						SystemClock.uptimeMillis() + ONE_MINUTE);
@@ -94,6 +112,8 @@ public class BackgroundService extends Service{
 	 private static Handler mDatabaseHandler = new Handler();
 	  
 	 private static boolean _stopSensing = false;
+	 
+	 private static String _imei; 
 	 
 	 private static final String TAG = "BACKGROUNDSERVICE";
 	 

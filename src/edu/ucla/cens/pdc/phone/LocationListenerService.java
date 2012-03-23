@@ -2,8 +2,7 @@ package edu.ucla.cens.pdc.phone;
 
 import java.util.Calendar;
 
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.json.simple.JSONObject;
 
 import android.app.Service;
 import android.content.ContentValues;
@@ -87,16 +86,15 @@ public class LocationListenerService extends Service implements LocationListener
 	    eventsData.close();
 	 }
 	  
-	  public void addGPSData()
+	  @SuppressWarnings("unchecked")
+	public JSONObject addGPSData()
 	  {
 	  	SQLiteDatabase db = eventsData.getWritableDatabase();
 	  	JSONObject jsonObject = new JSONObject();
-	  	try {
-	  		jsonObject.put("latitude", _latitude);
-	  		jsonObject.put("longitude", _longitude);
-		} catch (JSONException e) {
-			e.printStackTrace();
-		}
+  	
+  		jsonObject.put("latitude", _latitude);
+  		jsonObject.put("longitude", _longitude);
+	
 		ContentValues values = new ContentValues();
 		Calendar calendar = Calendar.getInstance();
 		values.put(EventDataSQLHelper.USERID, _imei);
@@ -105,6 +103,7 @@ public class LocationListenerService extends Service implements LocationListener
 						calendar.getTime()) + "");
 	    values.put(EventDataSQLHelper.GPS, jsonObject.toString());
 	    db.insert(EventDataSQLHelper.TABLE2, null, values);
+	    return jsonObject;
 	  }
   
 	  private Binder mBinder = new LocationListenerServiceBinder();

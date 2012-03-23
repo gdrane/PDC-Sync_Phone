@@ -17,6 +17,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".Second" />
         <service android:name=".BackgroundService" />
         <service android:name=".LocationListenerService" />
         <service android:name=".ReadingsService" />

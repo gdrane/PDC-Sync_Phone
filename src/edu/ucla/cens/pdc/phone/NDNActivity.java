@@ -1,13 +1,12 @@
 package edu.ucla.cens.pdc.phone;
 
+import edu.ucla.cens.pdc.phone.Second;
+
 import android.app.Activity;
-import android.content.ComponentName;
-import android.content.Context;
+import android.app.ProgressDialog;
 import android.content.Intent;
-import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.IBinder;
 import android.os.Message;
 import android.os.StrictMode;
 import android.util.Log;
@@ -25,6 +24,27 @@ import android.widget.Toast;
 public final class NDNActivity extends Activity implements
 		OnClickListener, NDNManagerCallback {
 	/** Called when the activity is first created. */
+	
+	private class ProgressThread extends Thread {
+		public void run() {
+			if(_etRemoteHost.getText().toString().equals("") ||
+					_etRemotePort.getText().toString().equals(""))
+				{
+				postProcess("You have not entered remote host ip or port", 
+				false);
+				}
+			_ndn_manager.setRemotehost(
+					_etRemoteHost.getText().toString());
+			_ndn_manager.
+				setRemoteport(Integer.parseInt(_etRemotePort.
+								getText().toString()));
+			_ndn_manager.startCCNx();
+			_ndn_manager.registerHandler();
+			_ndn_manager.startSync();
+			startActivity(new Intent(NDNActivity.this,Second.class));
+		}
+	}
+	
 	@Override
 	public void onCreate(Bundle savedInstanceState)
 	{
@@ -38,7 +58,7 @@ public final class NDNActivity extends Activity implements
 	
 		Log.i(TAG, "onCreate()");
 	
-		_tv_status = (TextView) findViewById(R.id.tvStatus);
+		_tv_status = (TextView) findViewById(R.id.tvStatusMain);
 		if (_tv_status == null)
 			throw new Error("Could not find tvStatus");
 		
@@ -46,7 +66,12 @@ public final class NDNActivity extends Activity implements
 		if(_connect_remote_button == null)
 			throw new Error("Could not find Remote Button");
 		
-		_sync_button = (Button) findViewById(R.id.Sync);
+		_connect_remote_button.setOnClickListener(this);
+		
+		_etRemoteHost = (EditText) findViewById(R.id.etRemoteIP);
+		_etRemotePort = (EditText) findViewById(R.id.etRemotePort);
+		
+		/*_sync_button = (Button) findViewById(R.id.Sync);
 		if(_sync_button == null)
 			throw new Error("Could not find Sync Button");
 		_register_handler_button = (Button) findViewById(R.id.RegisterHandler);
@@ -57,26 +82,22 @@ public final class NDNActivity extends Activity implements
 		
 		_register_handler_button.setOnClickListener(this);
 		_sync_button.setOnClickListener(this);
-		_connect_remote_button.setOnClickListener(this);
 		_start_sensing.setOnClickListener(this);
-		_stop_sensing.setOnClickListener(this);
-	
-		_etRemoteHost = (EditText) findViewById(R.id.etRemoteIP);
-		_etRemotePort = (EditText) findViewById(R.id.etRemotePort);
+		_stop_sensing.setOnClickListener(this);*/
 		
 		_ndn_manager = NDNManager.getInstance();
 		_ndn_manager.setCallbackInterface(this);
 		_ndn_manager.InitializeCCNx(getApplicationContext());
 		Log.i(TAG, "Binding");
-		bindService(new Intent(NDNActivity.this, 
-	            ReadingsService.class), mReadingsServiceConnection, 
-	            Context.BIND_AUTO_CREATE);
-		bindService(new Intent(NDNActivity.this, 
-					BackgroundService.class), mBackgroundServiceConnection, 
-					Context.BIND_AUTO_CREATE);
-		bindService(new Intent(NDNActivity.this, LocationListenerService.class),
-	            mLocationListenerServiceConnection, 
-	            Context.BIND_AUTO_CREATE);
+	
+		
+		_pd = new ProgressDialog(this);
+	    _pd.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+	    _pd.setMessage("Connecting to Server");
+	    //pd.setIndeterminate(false);
+	    _pd.setCancelable(true);
+	    
+	    _progThr = new ProgressThread();
 	}
 	
 	@Override
@@ -87,6 +108,9 @@ public final class NDNActivity extends Activity implements
 		switch (v.getId()) {
 		
 			case R.id.Connect:
+					_pd.show();
+					_progThr.start();
+					/*
 					if(_etRemoteHost.getText().toString().equals("") ||
 						_etRemotePort.getText().toString().equals(""))
 					{
@@ -99,23 +123,8 @@ public final class NDNActivity extends Activity implements
 						setRemoteport(Integer.parseInt(_etRemotePort.
 										getText().toString()));
 					_ndn_manager.startCCNx();
+					*/
 					break;
-			case R.id.RegisterHandler:
-					_ndn_manager.registerHandler();
-					break;
-	
-			case R.id.Sync:
-					_ndn_manager.startSync();
-					_ndn_manager.addTestObject();
-					break;
-					
-			case R.id.StartSensing:
-					mBackgroundService.startSensing();
-					break;
-			case R.id.StopSensing:
-					mBackgroundService.stopSensing();
-					break;
-	
 			default:
 					break;
 		}
@@ -124,10 +133,6 @@ public final class NDNActivity extends Activity implements
 	
 	public void onDestroy()
 	{
-		_ndn_manager.shutdown();
-		unbindService(mReadingsServiceConnection);
-		unbindService(mBackgroundServiceConnection);
-		unbindService(mLocationListenerServiceConnection);
 		super.onDestroy();
 	}
 	
@@ -188,89 +193,7 @@ public final class NDNActivity extends Activity implements
 		}
 	};
 	
-	 private ServiceConnection mBackgroundServiceConnection = 
-			 new ServiceConnection() {
-		 public void onServiceConnected(ComponentName className, IBinder service) {
-	            // This is called when the connection with the service has been
-	            // established, giving us the service object we can use to
-	            // interact with the service.  Because we have bound to a explicit
-	            // service that we know is running in our own process, we can
-	            // cast its IBinder to a concrete class and directly access it.
-	            mBackgroundService =
-	            		((BackgroundService.BackgroundServiceBinder)service).
-	            		getService();
-	            Log.i(TAG, "Background Service Connected");
-	        }
 	
-		 public void onServiceDisconnected(ComponentName className) {
-	            // This is called when the connection with the service has been
-	            // unexpectedly disconnected -- that is, its process crashed.
-	            // Because it is running in our same process, we should never
-	            // see this happen.
-	            mBackgroundService = null;
-	        }
-	 };
-	
-	 private ServiceConnection mLocationListenerServiceConnection = 
-			 new ServiceConnection() {
-		 public void onServiceConnected(ComponentName className, IBinder service) {
-	            // This is called when the connection with the service has been
-	            // established, giving us the service object we can use to
-	            // interact with the service.  Because we have bound to a explicit
-	            // service that we know is running in our own process, we can
-	            // cast its IBinder to a concrete class and directly access it.
-	            mLocationListenerService = 
-	            		((LocationListenerService.
-	            				LocationListenerServiceBinder)service).
-	            				getService();
-	            Log.i(TAG, "Location Listener Service Connected");
-	        }
-	
-		 public void onServiceDisconnected(ComponentName className) {
-	            // This is called when the connection with the service has been
-	            // unexpectedly disconnected -- that is, its process crashed.
-	            // Because it is running in our same process, we should never
-	            // see this happen.
-	            mLocationListenerService = null;
-	        }
-	 };
-	 
-	  private ServiceConnection mReadingsServiceConnection = 
-			  new ServiceConnection() {
-	        public void onServiceConnected(ComponentName className, 
-	        		IBinder service) {
-	            // This is called when the connection with the service has been
-	            // established, giving us the service object we can use to
-	            // interact with the service.  Because we have bound to a explicit
-	            // service that we know is running in our own process, we can
-	            // cast its IBinder to a concrete class and directly access it.
-	            mReadingsService = 
-	            		((ReadingsService.ReadingsServiceBinder)service).
-	            		getService();
-	            Log.i(TAG, "Acclerometer Readings Service Connected");
-	        }
-	
-	        public void onServiceDisconnected(ComponentName className) {
-	            // This is called when the connection with the service has been
-	            // unexpectedly disconnected -- that is, its process crashed.
-	            // Because it is running in our same process, we should never
-	            // see this happen.
-	            mReadingsService = null;
-	        }
-	    };
-	    
-    public static ReadingsService getReadingsService() {
-    	return mReadingsService;
-    }
-    
-    public static LocationListenerService getLocationListenerService() {
-    	return mLocationListenerService;
-    }
-    
-    public static BackgroundService getBackgroundService() {
-    	return mBackgroundService;
-    }
-
 	enum ConnectionState {
 		INITIAL, STARTED
 	}
@@ -300,13 +223,11 @@ public final class NDNActivity extends Activity implements
 	private Button _sync_button, _register_handler_button, _start_sensing,
 	_connect_remote_button, _stop_sensing;
 	
-	private TextView _tv_status;
-	
 	private EditText _etRemoteHost, _etRemotePort;
 	
-	private static ReadingsService mReadingsService;
+	private ProgressThread _progThr;
 	
-	private static BackgroundService mBackgroundService;
+	private ProgressDialog _pd;
 	
-	private static LocationListenerService mLocationListenerService;
+	private TextView _tv_status;
 }

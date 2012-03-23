@@ -3,6 +3,8 @@ package edu.ucla.cens.pdc.phone;
 import java.util.ArrayList;
 import java.util.Calendar;
 
+import org.json.simple.JSONObject;
+
 import android.app.Service;
 import android.content.ContentValues;
 import android.content.Intent;
@@ -220,16 +222,21 @@ public class ReadingsService extends Service implements SensorEventListener {
 		}
 	}
 	
-	public void addEvent() {
+	@SuppressWarnings("unchecked")
+	public JSONObject addEvent() {
+		double avgVar = calcAvgVar();
+		JSONObject jsonObject = new JSONObject();
 	    SQLiteDatabase db = eventsData.getWritableDatabase();
 	    ContentValues values = new ContentValues();
-	    Calendar calendar = Calendar.getInstance();
+	    Calendar calendar = Calendar.getInstance();    
+		jsonObject.put("AVG_VAR", avgVar);
 	    values.put(EventDataSQLHelper.USERID, _imei);
 	    values.put(EventDataSQLHelper.TIME, 
 	    		DateFormat.format("yyyy-MM-dd kk:mm:ss", calendar.getTime()) + 
 	    		"");
-	    values.put(EventDataSQLHelper.ACCEL, "" + calcAvgVar());
+	    values.put(EventDataSQLHelper.ACCEL, "" + avgVar);
 	    db.insert(EventDataSQLHelper.TABLE, null, values);
+	    return jsonObject;
 	}
 	
 	private double calcAvgVar() {

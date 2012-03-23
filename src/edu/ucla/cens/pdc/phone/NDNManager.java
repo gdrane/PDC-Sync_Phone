@@ -1,6 +1,9 @@
 package edu.ucla.cens.pdc.phone;
 
 import java.io.IOException;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
 
 import org.ccnx.android.ccnlib.CCNxConfiguration;
 import org.ccnx.android.ccnlib.CCNxServiceCallback;
@@ -11,14 +14,12 @@ import org.ccnx.android.ccnlib.CcndWrapper.CCND_OPTIONS;
 import org.ccnx.android.ccnlib.RepoWrapper.REPO_OPTIONS;
 import org.ccnx.ccn.CCNHandle;
 import org.ccnx.ccn.config.ConfigurationException;
-import org.ccnx.ccn.io.RepositoryFileOutputStream;
 import org.ccnx.ccn.io.RepositoryOutputStream;
 import org.ccnx.ccn.io.content.ConfigSlice;
 import org.ccnx.ccn.io.content.ContentDecodingException;
 import org.ccnx.ccn.profiles.ccnd.CCNDaemonException;
 import org.ccnx.ccn.profiles.ccnd.SimpleFaceControl;
 import org.ccnx.ccn.protocol.ContentName;
-import org.ccnx.ccn.protocol.ContentObject;
 import org.ccnx.ccn.protocol.KeyLocator;
 import org.ccnx.ccn.protocol.MalformedContentNameStringException;
 import org.ccnx.ccn.protocol.SignedInfo.ContentType;
@@ -150,7 +151,40 @@ public class NDNManager implements CCNxServiceCallback {
 		}
 	}
 	
+
+	public void addObjectToRepo(String repo_string) {
+		try {
+			byte[] data = repo_string.getBytes(); 
+			Date date = new Date();   // given date
+			Calendar calendar = GregorianCalendar.getInstance(); // creates a new calendar instance
+			calendar.setTime(date);   // assigns calendar to given date 
+			calendar.get(Calendar.HOUR_OF_DAY); // gets hour in 24h format
+			calendar.get(Calendar.MONTH); 
+			ContentName repo_name = ContentName.fromNative(DATA_NAMESPACE).
+					append("" + calendar.get(Calendar.YEAR)).
+					append("" + calendar.get(Calendar.MONTH)).
+					append("" + calendar.get(Calendar.DAY_OF_MONTH)).
+					append("" + calendar.get(Calendar.HOUR_OF_DAY)).
+					append("" + calendar.get(Calendar.MINUTE)).
+					append("" + calendar.get(Calendar.SECOND)).
+					append("" + calendar.get(Calendar.MILLISECOND));
+			RepositoryOutputStream ros = new RepositoryOutputStream(
+					repo_name, _locator,
+					_ccn_handle.getDefaultPublisher(), ContentType.DATA, null, 
+					_ccn_handle);
+			ros.write(data, 0, data.length);
+			ros.close();
+		} catch (MalformedContentNameStringException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
 	public synchronized void startSync() {
+		Log.i(TAG, "Starting Sync");
 		if(_ccnx_service.isAllRunning()) {
 			try {
 				ContentName topology_name = ContentName.fromNative(TOPOLOGY_NAMESPACE);
